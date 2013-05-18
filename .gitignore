@@ -1,0 +1,6 @@
+/pkg
+.project
+*.linux
+*.exe
+*.osx
+.DS_Store
