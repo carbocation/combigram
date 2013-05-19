@@ -5,8 +5,9 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 
-	"github.com/carbocation/go-instagram"
+	"github.com/carbocation/go.instagram"
 	"github.com/gorilla/mux"
 )
 
@@ -19,7 +20,11 @@ func init() {
 }
 
 func searchTags(w http.ResponseWriter, r *http.Request) {
+	return
+}
 
+func welcome(w http.ResponseWriter, r *http.Request) {
+	return
 }
 
 func postSearchTags(w http.ResponseWriter, r *http.Request) {
@@ -28,10 +33,25 @@ func postSearchTags(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
+	
+	//Get the user's query (looks like /tags/iamatag%20soami%20metoo)	
+	vars := mux.Vars(r)
+	tags := strings.Split(vars["tags"], ` `)
 
-	out := ig.TagsMediaRecent("golang")
+	out, err := ig.TagsMediaRecent(tags)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	
+	if out.Meta.Code != http.StatusOK {
+		fmt.Fprintf(w, "Status %d. We received an error from Instagram.\n", out.Meta.Code)
+		return
+	}
 
-	fmt.Fprintf(w, "%s", out)
+	fmt.Fprintf(w, "Meta:\n%+v\n", out.Meta)
+	fmt.Fprintf(w, "Pagination:\n%+v\n", out.Pagination)
+	fmt.Fprintf(w, "Data:\n%+v\n", out.Data)
 }
 
 func hello(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +80,8 @@ func RedirectHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	r := mux.NewRouter()
-	r.HandleFunc("/", postSearchTags)
+	r.HandleFunc("/", welcome)
+	r.HandleFunc("/tags/{tags:[0-9a-z ]+}", postSearchTags)
 	r.HandleFunc("/hello", hello)
 	r.HandleFunc("/redirect/instagram", RedirectHandler)
 	http.Handle("/", r)
