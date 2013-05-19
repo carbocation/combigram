@@ -21,6 +21,8 @@ func init() {
 }
 
 func welcome(w http.ResponseWriter, r *http.Request) {
+	template.Must(template.New("welcome").Parse(tpl.all)).Execute(w, struct{}{})
+	
 	return
 }
 
@@ -54,7 +56,7 @@ func searchTags(w http.ResponseWriter, r *http.Request) {
 		Query: tags,
 	}
 
-	template.Must(template.New("searchTags").Parse(tpl.searchTags)).Execute(w, data)
+	template.Must(template.New("searchTags").Parse(tpl.all)).Execute(w, data)
 	/*
 		fmt.Fprintf(w, "Meta:\n%+v\n", out.Meta)
 		fmt.Fprintf(w, "Pagination:\n%+v\n", out.Pagination)
@@ -63,9 +65,9 @@ func searchTags(w http.ResponseWriter, r *http.Request) {
 }
 
 var tpl = struct {
-	searchTags string
+	all string
 }{
-	searchTags: `{{define "searchTags"}}
+	all: `{{define "searchTags"}}
 <html>
 <head>
 <title>
@@ -73,12 +75,8 @@ var tpl = struct {
 </title>
 </head>
 <body>
-<h1>{{range .Query}}{{.}}+{{end}}</h1>
+<h1>You searched for {{range .Query}}#{{.}}+{{end}}</h1>
 <br />
-<br />
-Pagination:
-<br />
-Data
 <br />
 {{range .Json.Data}}
 	{{template "parseData" .}}
@@ -91,13 +89,25 @@ Data
 
 {{define "parseData"}}
 <div>
-	By {{.User.Username}}:
+	By {{.User.Username}}
+	<br />
+	Tags: 
+	{{range .Tags}}#{{.}}, {{end}}
 	<br />
 	{{with .Images.LowResolution}}
 		<img src="{{.URL}}" width={{.Width}} height={{.Height}}>
 	{{end}}
 	<br />
 </div>
+{{end}}
+
+{{define "welcome"}}
+<html>
+<body>
+<h1>Welcome</h1>
+<a href="/tags/golang%20gopher">Try an example search for tags containing 'golang' and 'gopher'</a>
+</body>
+</html>
 {{end}}`,
 }
 
