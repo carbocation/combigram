@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -19,22 +20,18 @@ func init() {
 	})
 }
 
-func searchTags(w http.ResponseWriter, r *http.Request) {
-	return
-}
-
 func welcome(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func postSearchTags(w http.ResponseWriter, r *http.Request) {
+func searchTags(w http.ResponseWriter, r *http.Request) {
 	ig, err := instagram.NewInstagram()
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	
-	//Get the user's query (looks like /tags/iamatag%20soami%20metoo)	
+
+	//Get the user's query (looks like /tags/iamatag%20soami%20metoo)
 	vars := mux.Vars(r)
 	tags := strings.Split(vars["tags"], ` `)
 
@@ -43,29 +40,65 @@ func postSearchTags(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	
+
 	if out.Meta.Code != http.StatusOK {
 		fmt.Fprintf(w, "Status %d. We received an error from Instagram.\n", out.Meta.Code)
 		return
 	}
 
-	fmt.Fprintf(w, "Meta:\n%+v\n", out.Meta)
-	fmt.Fprintf(w, "Pagination:\n%+v\n", out.Pagination)
-	fmt.Fprintf(w, "Data:\n%+v\n", out.Data)
-}
-
-func hello(w http.ResponseWriter, r *http.Request) {
-	ig, err := instagram.NewInstagram()
-	if err != nil {
-		log.Println(err)
-		return
+	var data = struct {
+		Json  *instagram.InstagramResponse
+		Query []string
+	}{
+		Json:  out,
+		Query: tags,
 	}
 
-	url := ig.Authenticate("basic")
-	log.Println(url)
-	http.Redirect(w, r, url, http.StatusFound)
+	template.Must(template.New("searchTags").Parse(tpl.searchTags)).Execute(w, data)
+	/*
+		fmt.Fprintf(w, "Meta:\n%+v\n", out.Meta)
+		fmt.Fprintf(w, "Pagination:\n%+v\n", out.Pagination)
+		fmt.Fprintf(w, "Data:\n%+v\n", out.Data)
+	*/
+}
 
-	return
+var tpl = struct {
+	searchTags string
+}{
+	searchTags: `{{define "searchTags"}}
+<html>
+<head>
+<title>
+{{range .Query}}{{.}}+{{end}}
+</title>
+</head>
+<body>
+<h1>{{range .Query}}{{.}}+{{end}}</h1>
+<br />
+<br />
+Pagination:
+<br />
+Data
+<br />
+{{range .Json.Data}}
+	{{template "parseData" .}}
+	<br />
+	<br />
+{{end}}
+</body>
+</html>
+{{end}}
+
+{{define "parseData"}}
+<div>
+	By {{.User.Username}}:
+	<br />
+	{{with .Images.LowResolution}}
+		<img src="{{.URL}}" width={{.Width}} height={{.Height}}>
+	{{end}}
+	<br />
+</div>
+{{end}}`,
 }
 
 func RedirectHandler(w http.ResponseWriter, r *http.Request) {
@@ -80,10 +113,9 @@ func RedirectHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	r := mux.NewRouter()
-	r.HandleFunc("/", welcome)
-	r.HandleFunc("/tags/{tags:[0-9a-z ]+}", postSearchTags)
-	r.HandleFunc("/hello", hello)
+	r.HandleFunc("/", welcome).Name("welcome")
+	r.HandleFunc("/tags/{tags:[0-9a-z ]+}", searchTags).Name("searchTags")
 	r.HandleFunc("/redirect/instagram", RedirectHandler)
 	http.Handle("/", r)
-	http.ListenAndServe(":9999", nil)
+	http.ListenAndServe(":9998", nil)
 }
