@@ -43,13 +43,8 @@ func searchTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if out.Meta.Code != http.StatusOK {
-		fmt.Fprintf(w, "Status %d. We received an error from Instagram.\n", out.Meta.Code)
-		return
-	}
-
 	var data = struct {
-		Json  *instagram.InstagramResponse
+		Json  *[]instagram.InstagramData
 		Query []string
 	}{
 		Json:  out,
@@ -78,7 +73,7 @@ var tpl = struct {
 <h1>You searched for {{range .Query}}#{{.}}+{{end}}</h1>
 <br />
 <br />
-{{range .Json.Data}}
+{{range .Json}}
 	{{template "parseData" .}}
 	<br />
 	<br />
