@@ -22,7 +22,7 @@ func init() {
 
 func welcome(w http.ResponseWriter, r *http.Request) {
 	template.Must(template.New("welcome").Parse(tpl.all)).Execute(w, struct{}{})
-	
+
 	return
 }
 
@@ -40,6 +40,7 @@ func searchTags(w http.ResponseWriter, r *http.Request) {
 	out, err := ig.TagsMediaRecent(tags)
 	if err != nil {
 		log.Println(err)
+		template.Must(template.New("error").Parse(tpl.all)).Execute(w, struct{ Error error }{Error: err})
 		return
 	}
 
@@ -52,6 +53,41 @@ func searchTags(w http.ResponseWriter, r *http.Request) {
 	}
 
 	template.Must(template.New("searchTags").Parse(tpl.all)).Execute(w, data)
+	/*
+		fmt.Fprintf(w, "Meta:\n%+v\n", out.Meta)
+		fmt.Fprintf(w, "Pagination:\n%+v\n", out.Pagination)
+		fmt.Fprintf(w, "Data:\n%+v\n", out.Data)
+	*/
+}
+
+func searchLatLong(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Searching lat long")
+	ig, err := instagram.NewInstagram()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	//Get the user's query (looks like /tags/iamatag%20soami%20metoo)
+	vars := mux.Vars(r)
+	lat, long := vars["lat"], vars["long"]
+
+	out, err := ig.LocationSearch(lat, long)
+	if err != nil {
+		log.Println(err)
+		template.Must(template.New("error").Parse(tpl.all)).Execute(w, struct{ Error error }{Error: err})
+		return
+	}
+
+	var data = struct {
+		Json  *[]instagram.InstagramData
+		Query []string
+	}{
+		Json:  out,
+		Query: []string{lat, long},
+	}
+
+	template.Must(template.New("searchLatLong").Parse(tpl.all)).Execute(w, data)
 	/*
 		fmt.Fprintf(w, "Meta:\n%+v\n", out.Meta)
 		fmt.Fprintf(w, "Pagination:\n%+v\n", out.Pagination)
@@ -84,8 +120,14 @@ var tpl = struct {
 
 {{define "parseData"}}
 <div>
-	By {{.User.Username}}
+	By {{.User.Username}} on {{.Created}}
 	<br />
+	{{ if .Location }}
+		In {{.Location.Name}}<br />
+		Lat: {{.Location.Latitude}}<br />
+		Long: {{.Location.Longitude}}<br />
+		<br />
+	{{end}}
 	Tags: 
 	{{range .Tags}}#{{.}}, {{end}}
 	<br />
@@ -103,6 +145,13 @@ var tpl = struct {
 <a href="/tags/golang%20gopher">Try an example search for tags containing 'golang' and 'gopher'</a>
 </body>
 </html>
+{{end}}
+
+{{define "error"}}
+<h1>Error</h1>
+{{.Error}}
+<br />
+This is usually because they blocked a query with adult language.
 {{end}}`,
 }
 
@@ -120,7 +169,12 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", welcome).Name("welcome")
 	r.HandleFunc("/tags/{tags:[0-9a-z ]+}", searchTags).Name("searchTags")
+	r.HandleFunc("/lat/{lat:[0-9a-z -.]+}/long/{long:[0-9a-z -.]+}", searchLatLong).Name("searchLatLong")
 	r.HandleFunc("/redirect/instagram", RedirectHandler)
 	http.Handle("/", r)
-	http.ListenAndServe(":9998", nil)
+
+	//Launch the server
+	if err := http.ListenAndServe("localhost:9998", nil); err != nil {
+		panic(err)
+	}
 }
